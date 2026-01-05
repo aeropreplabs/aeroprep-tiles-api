@@ -15,3 +15,6 @@ dist/
 
 # OS noise
 .DS_Store
+
+# Tarballs
+*.tar.gz
