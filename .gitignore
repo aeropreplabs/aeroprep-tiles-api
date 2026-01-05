@@ -1,0 +1,17 @@
+# Node / frontend
+node_modules/
+dist/
+.vite/
+
+# Generated map artifacts
+/tiles/
+/_geotiff_work/
+
+# Downloaded archives
+*.zip
+
+# Logs
+*.log
+
+# OS noise
+.DS_Store
