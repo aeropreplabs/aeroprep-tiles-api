@@ -48,3 +48,10 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Sectional tile API listening on port ${PORT}`);
 });
+
+// -----------------------------------------------------------------------------
+// 200 Server Response during File Download
+// -----------------------------------------------------------------------------
+app.get("/", (_req, res) => {
+  res.status(200).send("ok");
+});
