@@ -1,5 +1,4 @@
 import express from "express";
-import path from "path";
 
 const app = express();
 
@@ -11,8 +10,44 @@ const app = express();
 const TILES_ROOT = "/var/data/tiles";
 
 // -----------------------------------------------------------------------------
-// Health check (Render uses this to verify the service is alive)
+// CORS
+// Local dev (Vite) runs at http://localhost:5173 and will be blocked unless
+// the tiles API sends Access-Control-Allow-Origin.
+// Add your production frontend origin here later (Render static site / custom domain).
 // -----------------------------------------------------------------------------
+const ALLOWED_ORIGINS = new Set([
+  "http://localhost:5173",
+  "http://127.0.0.1:5173",
+  // Example (add later when you have it):
+  // "https://app.aeropreplabs.com",
+]);
+
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+
+  // Only set CORS headers for allowed browser origins
+  if (origin && ALLOWED_ORIGINS.has(origin)) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+    res.setHeader("Vary", "Origin");
+    res.setHeader("Access-Control-Allow-Methods", "GET,HEAD,OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  }
+
+  // Handle preflight requests
+  if (req.method === "OPTIONS") {
+    return res.status(204).end();
+  }
+
+  next();
+});
+
+// -----------------------------------------------------------------------------
+// Root + health check
+// -----------------------------------------------------------------------------
+app.get("/", (_req, res) => {
+  res.status(200).send("ok");
+});
+
 app.get("/health", (_req, res) => {
   res.json({ status: "ok" });
 });
@@ -33,10 +68,7 @@ app.use(
   })
 );
 
-// -----------------------------------------------------------------------------
-// Optional: explicit 404 handler for missing tiles
-// (keeps logs cleaner than Express default HTML response)
-// -----------------------------------------------------------------------------
+// Clean 404 for missing tiles
 app.use("/tiles", (_req, res) => {
   res.status(404).end();
 });
@@ -47,11 +79,4 @@ app.use("/tiles", (_req, res) => {
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Sectional tile API listening on port ${PORT}`);
-});
-
-// -----------------------------------------------------------------------------
-// 200 Server Response during File Download
-// -----------------------------------------------------------------------------
-app.get("/", (_req, res) => {
-  res.status(200).send("ok");
 });
