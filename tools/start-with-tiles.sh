@@ -15,8 +15,25 @@ if [ ! -d /var/data/tiles/chicago/13 ]; then
 
   echo "Extracting tiles..."
   tar -xzf /var/data/chicago-tiles.tar.gz -C /var/data/tiles
-
   rm -f /var/data/chicago-tiles.tar.gz
+
+  # ---- Normalize folder layout ----
+  # If archive was created as tiles/chicago/... it will land in /var/data/tiles/tiles/chicago/...
+  if [ -d /var/data/tiles/tiles/chicago ] && [ ! -d /var/data/tiles/chicago ]; then
+    echo "Normalizing tile folder layout (/var/data/tiles/tiles/chicago -> /var/data/tiles/chicago)..."
+    mkdir -p /var/data/tiles/chicago
+    mv /var/data/tiles/tiles/chicago/* /var/data/tiles/chicago/ || true
+    rm -rf /var/data/tiles/tiles
+  fi
+
+  # Sanity check
+  if [ ! -d /var/data/tiles/chicago/13 ]; then
+    echo "ERROR: Tiles extraction completed but /var/data/tiles/chicago/13 not found."
+    echo "Contents of /var/data/tiles:"
+    ls -lah /var/data/tiles | head -n 200
+    exit 1
+  fi
+
   echo "Tiles install complete."
 else
   echo "Tiles already present on disk. Skipping download."
