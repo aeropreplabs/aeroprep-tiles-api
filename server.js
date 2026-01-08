@@ -1,4 +1,6 @@
 import express from "express";
+import fs from "fs/promises";
+import path from "path";
 
 const app = express();
 
@@ -25,7 +27,6 @@ const ALLOWED_ORIGINS = new Set([
 app.use((req, res, next) => {
   const origin = req.headers.origin;
 
-  // Only set CORS headers for allowed browser origins
   if (origin && ALLOWED_ORIGINS.has(origin)) {
     res.setHeader("Access-Control-Allow-Origin", origin);
     res.setHeader("Vary", "Origin");
@@ -33,7 +34,6 @@ app.use((req, res, next) => {
     res.setHeader("Access-Control-Allow-Headers", "Content-Type");
   }
 
-  // Handle preflight requests
   if (req.method === "OPTIONS") {
     return res.status(204).end();
   }
@@ -53,24 +53,47 @@ app.get("/health", (_req, res) => {
 });
 
 // -----------------------------------------------------------------------------
-// Serve sectional tiles as static assets
-// URL format:
-//   /tiles/chicago/{z}/{x}/{y}.png
+// Tile endpoint with XYZ -> TMS fallback
+// Leaflet requests XYZ tiles: /{z}/{x}/{y}.png
+// Many generators produce TMS tiles where Y is flipped.
+// If XYZ path 404s, try TMS:
+//   y_tms = (2^z - 1 - y_xyz)
 // -----------------------------------------------------------------------------
-app.use(
-  "/tiles",
-  express.static(TILES_ROOT, {
-    maxAge: "365d",
-    immutable: true,
-    setHeaders: (res) => {
-      res.setHeader("Content-Type", "image/png");
-    },
-  })
-);
+app.get("/tiles/:chartId/:z/:x/:y.png", async (req, res) => {
+  const { chartId, z, x, y } = req.params;
 
-// Clean 404 for missing tiles
-app.use("/tiles", (_req, res) => {
-  res.status(404).end();
+  const Z = Number(z);
+  const X = Number(x);
+  const Y = Number(y);
+
+  if (![Z, X, Y].every(Number.isInteger) || Z < 0 || X < 0 || Y < 0) {
+    return res.status(400).send("Invalid tile coordinates");
+  }
+
+  const xyzPath = path.join(TILES_ROOT, chartId, String(Z), String(X), `${Y}.png`);
+
+  const yTms = (2 ** Z - 1 - Y);
+  const tmsPath = path.join(TILES_ROOT, chartId, String(Z), String(X), `${yTms}.png`);
+
+  try {
+    let filePath = xyzPath;
+
+    // Prefer XYZ if it exists, otherwise try TMS
+    try {
+      await fs.access(xyzPath);
+    } catch {
+      await fs.access(tmsPath);
+      filePath = tmsPath;
+    }
+
+    const data = await fs.readFile(filePath);
+
+    res.setHeader("Content-Type", "image/png");
+    res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+    return res.status(200).send(data);
+  } catch {
+    return res.status(404).end();
+  }
 });
 
 // -----------------------------------------------------------------------------
